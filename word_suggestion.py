@@ -14,7 +14,7 @@ import json, re
 # src: https://datascience.stackexchange.com/questions/26366/training-an-rnn-with-examples-of-different-lengths-in-keras
 # . Within a single batch, you must have the same number of timesteps since it must be a tensor (this is typically where you see 0-padding). But between batches there is no such restriction. During inference, you can have any length.
 class Word_Suggestion:
-    def __init__(self, vocab_size, max_sequence_len, word_to_id, id_to_word):
+    def __init__(self, vocab_size, max_sequence_len=75, word_to_id, id_to_word):
         self.vocab_size = vocab_size
         self.max_sequence_len = max_sequence_len
         self.word_to_id = word_to_id
@@ -72,7 +72,7 @@ class Word_Suggestion:
 
     # def load_shakespeare(self):
     #     pass
-    
+    g
     # def split_input_target(self, chunk):
     #     input_text = chunk[:-1]
     #     target_text = chunk[1:]
@@ -84,34 +84,75 @@ class Suggest_Util:
     #@return (word_to_id, id_to_word)
     @staticmethod
     def words_to_id(text, old_words_to_id=None):
+        """Create a mapping between each word and a unique index
+
+        # Arguments
+            text: A string to be converted to a list of integers
+
+        # Returns
+            A tuple composed of word to id dictionary and id to word dictionary
+        """
         text = Suggest_Util.remove_escape_characters(text)
-        print(text)
         uniq_words = set(text.split(" "))
         word_to_id = {word:i for i, word in enumerate(uniq_words)}
         id_to_word = {v:k for k,v in word_to_id.items()}
         return word_to_id, id_to_word
 
-    #Convert all of the text to id
     @staticmethod
     def text_to_id(text, word_to_id_dict):
+        """Convert all of the text to id by using the word to id dictionary
+
+        # Arguments
+            text: A string to be converted to a list of integers
+            word_to_id_dict: A dictionary used to get the index of each word
+
+        # Returns
+            The index of integer equivalents
+        """
         text = Suggest_Util.remove_escape_characters(text)
         return [word_to_id_dict[word] for word in text.split(" ") if word in word_to_id_dict]
-
-    @staticmethod
-    def create_training_batches(text, batch_size, word_to_id):
-        #max(text.split(" ")
-        
-        # Create training examples / targets
-        char_dataset = tf.data.Dataset.from_tensor_slices(Suggest_Util.text_to_id(text, word_to_id))
         
     @staticmethod
     def remove_escape_characters(text):
+        """Remove all escape characters
+
+        # Arguments
+            text: A string to be cleansed of escape character
+
+        # Returns
+            The string without escape characters and lowercased
+        """
         text_removed_escape = list(map(lambda x: x.replace("\\", "").replace("'", "").strip().lower(), re.split(r"(?<=\\)[a-z]{1}", repr(text))))
         text_removed_extra_spaces = list(filter(lambda x: x != "", text_removed_escape))
         return " ".join(text_removed_extra_spaces)
 
     @staticmethod
-    def parse_conversation()
+    def parse_conversation_json(file_name):
+        dialogue = ""
+        conv = Suggest_Util.load_dict(file_name)
+        for line in conv:
+            dialogue += "\n" + line["text"]
+        return dialogue
+
+    @staticmethod
+    def train_gen(data, max_sequence_length):
+        """Generates training data for model
+        
+        # Arguments
+            data: A string to be sequenced into chunks for training
+            max_sequence_length: A integer representing the maximum sequence length
+        # Yields
+            A tuple of the training pair
+        """
+        for line in data.split('\n'):
+            encoded = Suggest_Util.text_to_id(line, word_to_id)
+            for i in range(1, len(encoded)):
+                sequence = encoded[:i+1]
+                sequences_np_arr = np.array(tf.keras.preprocessing.sequence.pad_sequences(sequence, maxlen=max_sequence_length, padding='pre'))
+                X, temp_y = sequences_np_arr[:,:-1], sequences_np_arr[:,-1]
+                y[i,:, :] = tf.keras.utils.to_categorical(y, num_classes=vocab_size)
+
+
 
     @staticmethod
     def save_dict(word_to_id, file_name="word_to_id.json"):
@@ -135,37 +176,35 @@ data = """Jack and Jill went up the hill\n
 		And Jill came tumbling after\n """
 
 def main():
-    data = """Jack and Jill went up the hill\n
-		To fetch a pail of water\n
-		Jack fell down and broke his crown\n
-		And Jill came tumbling after\n """
+    # data = """Jack and Jill went up the hill\n
+	# 	To fetch a pail of water\n
+	# 	Jack fell down and broke his crown\n
+	# 	And Jill came tumbling after\n """
+    data = Suggest_Util.parse_conversation_json("data/conversation.json")
+    # word_to_id, id_to_word = Suggest_Util.words_to_id(data)
+    # vocab_size = len(word_to_id)
     
-    word_to_id, id_to_word = Suggest_Util.words_to_id(data)
+    # sequences = list()
+    # max_length = 0
+    # for line in data.split('\n'):
+    #     encoded = Suggest_Util.text_to_id(line, word_to_id)
+    #     for i in range(1, len(encoded)):
+    #         sequence = encoded[:i+1]
+    #         if len(sequence) > max_length:
+    #             max_length = len(sequence)
+    #         sequences.append(sequence)
+    # sequences_np_arr = np.array(tf.keras.preprocessing.sequence.pad_sequences(sequences, maxlen=max_length, padding='pre'))
 
-    vocab_size = len(word_to_id)
-    # TODO CHANGE THIS TO READ FROM JSON DATA
-    sequences = list()
-    max_length = 0
-    for line in data.split('\n'):
-        encoded = Suggest_Util.text_to_id(line, word_to_id)
-        print(encoded)
-        for i in range(1, len(encoded)):
-            sequence = encoded[:i+1]
-            if len(sequence) > max_length:
-                max_length = len(sequence)
-            sequences.append(sequence)
+    # X, y = sequences_np_arr[:,:-1], sequences_np_arr[:,-1]
+    # y = tf.keras.utils.to_categorical(y, num_classes=vocab_size)
 
-    print(len(sequences))
-    sequences_np_arr = np.array(tf.keras.preprocessing.sequence.pad_sequences(sequences, maxlen=max_length, padding='pre'))
+    # word_suggest = Word_Suggestion(vocab_size, max_length, word_to_id, id_to_word)
+    # word_suggest.build_model()
+    # word_suggest.train(X,y, 10)
+    # print(word_suggest.generate_seq("There", 10))
+    # word_suggest.model.predict(tf.keras.preprocessing.sequence.pad_sequences(np.array("Jack"), maxlen=max_length, padding='pre'))
 
-    X, y = sequences_np_arr[:,:-1], sequences_np_arr[:,-1]
-    y = tf.keras.utils.to_categorical(y, num_classes=vocab_size)
-
-    word_suggest = Word_Suggestion(vocab_size, max_length, word_to_id, id_to_word)
-    word_suggest.build_model()
-    word_suggest.train(X,y, 10)
-    #print(word_suggest.generate_seq("Jack", 3))
-    #word_suggest.model.predict(tf.keras.preprocessing.sequence.pad_sequences(np.array("Jack"), maxlen=max_length, padding='pre'))
+    
 
 if __name__ == "__main__":
     main()
