@@ -72,7 +72,7 @@ class Word_Suggestion:
 
     # def load_shakespeare(self):
     #     pass
-    g
+
     # def split_input_target(self, chunk):
     #     input_text = chunk[:-1]
     #     target_text = chunk[1:]

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<head>
+    <title>Word Suggestion Demo</title>
+    <script src="suggest.js"></script>
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+<body onload="generateButtonEvents()">>
+    <div class="heading">
+        <h1>
+            Word Suggestion Demo
+        </h1>
+    </div>
+    <h3 id="Suggested-Words-Text">Suggested Words</h3>
+    <div class="flex-container">
+        <div class="suggestion" id=1>
+            <button type="button">Cat</button>
+        </div>
+        <div class="suggestion" id=2>
+            <button type="button">Dog</button>
+        </div>
+        <div class="suggestion" id=3>
+            <button type="button">Frog</button>
+        </div>
+    </div>
+
+    <div class="searchbar">
+            <span contenteditable="true" id="text-box" ></span>
+    </div>
+    
+</body>

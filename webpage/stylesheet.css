@@ -1,0 +1,43 @@
+.flex-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    margin-bottom: 2%;
+}
+
+.heading{
+    text-align:center;
+    margin-bottom: 10%;
+    font-size: 30px;
+}
+
+.suggestion > button {
+    background-color: #f1f1f1;
+    width: 100px;
+    margin: 10px;
+    text-align: center;
+    padding: 10px;
+    font-size: 30px;
+}
+
+.searchbar {
+    text-align:center;   
+}
+
+#Suggested-Words-Text {
+    text-align: center;
+    font-size: 2em;
+    text-decoration: underline;
+}
+#text-box {
+    border: solid 1px black;
+    min-width:20%;
+    max-width:75%;
+    padding: 5px;
+    display: inline-block;
+    font-size:24px;
+   }
+   
+#text-box:focus{
+     outline:0;
+   }
