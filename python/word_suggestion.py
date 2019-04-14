@@ -41,7 +41,7 @@ class Word_Suggestion:
         self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['categorical_accuracy'])
         #return self.model
 
-    def load_latest_model(self):
+    def load_and_build_latest_model(self):
         self.build_model()
         self.model.load_weights(tf.train.latest_checkpoint(self.checkpoint_dir))
     
@@ -52,7 +52,11 @@ class Word_Suggestion:
         else:
             #TODO: steps_per_epoch needs to be more accurate
             data = " ".join(data).split()
+            data = Suggest_Util.remove_escape_characters(data)
+            data = Suggest_Util.remove_whitespace(data)
+            data = Suggest_Util.remove_nonalphabet_chars(data)
             print("data: ", len(data))
+            print(data)
             # examples_per_epoch = len(text)//seq_length
             # steps_per_epoch = examples_per_epoch//BATCH_SIZE
             if has_checkpoint:
@@ -89,9 +93,26 @@ class Word_Suggestion:
                 cur_index  += self.skip_steps
             yield x, y
 
-    def predict(self, text):
-        text = text.lower()
+    def predict(self, text, top_num=5):
+        """Predict the word that could come next in the given text
 
+        # Arguments
+            text: A string to do the prediction on
+            top_num: A integer representing the number of top word predictions to send
+
+        # Returns
+            A list of the top_num words
+        """
+        text = Suggest_Util.remove_whitespace(text.lower())
+        text = Suggest_Util.remove_nonalphabet_chars(text)
+        encoded = Suggest_Util.text_to_id(text, self.word_to_id)
+        encoded_padded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=self.max_sequence_len, padding='pre')
+        prediction = self.model.predict(encoded_padded)
+        print(prediction.shape)
+        prediction = tf.squeeze(prediction, 0)
+        predict_words = np.argsort(prediction[self.max_sequence_len-1, :])[:top_num]
+        
+        return [self.id_to_word[str(word)] for word in predict_words]
 
     # generate a sequence from a language model
     def generate_seq(self, seed_text, n_words):
@@ -117,7 +138,6 @@ class Word_Suggestion:
 
 
 
-
 class Suggest_Util:
     #TODO include a way to update old one
     #@return (word_to_id, id_to_word)
@@ -132,6 +152,8 @@ class Suggest_Util:
             A tuple composed of word to id dictionary and id to word dictionary
         """
         text = Suggest_Util.remove_escape_characters(text)
+        text = Suggest_Util.remove_nonalphabet_chars(text)
+        text = Suggest_Util.remove_whitespace(text)
         uniq_words = set(text.split(" "))
         word_to_id = {word:i for i, word in enumerate(uniq_words)}
         id_to_word = {v:k for k,v in word_to_id.items()}
@@ -148,6 +170,8 @@ class Suggest_Util:
             A tuple composed of word to id dictionary and id to word dictionary
         """
         text = Suggest_Util.remove_escape_characters(" ".join(data))
+        text = Suggest_Util.remove_nonalphabet_chars(text)
+        text = Suggest_Util.remove_whitespace(text)
         uniq_words = set(text.split(" "))
         word_to_id = {word:i for i, word in enumerate(uniq_words)}
         id_to_word = {v:k for k,v in word_to_id.items()}
@@ -165,7 +189,9 @@ class Suggest_Util:
         # Returns
             The index of integer equivalents
         """
-        text = Suggest_Util.remove_escape_characters(text)
+        text = Suggest_Util.remove_escape_characters(text) # This may not be needed anymore
+        text = Suggest_Util.remove_nonalphabet_chars(text)
+        text = Suggest_Util.remove_whitespace(text)
         return [word_to_id_dict[word] for word in text.split(" ") if word in word_to_id_dict]
         
     @staticmethod
@@ -213,6 +239,10 @@ class Suggest_Util:
                     return dialogue, largest_seq
         return np.array(dialogue), largest_seq
 
+    @staticmethod
+    def remove_nonalphabet_chars(text):
+        return re.sub("[^a-zA-Z\'\-$%\" ]", "", text)
+        
     @staticmethod
     def save_dict(metadata, file_name="../config/model_metadata.json"):
         with open(file_name, 'w') as f:

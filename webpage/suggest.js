@@ -14,5 +14,17 @@ function generateButtonEvents() {
     };
 }
 
+function createWebsocket() {
+    console.log("Starting WebSocket...")
+    const socket= new WebSocket('ws://localhost:50007')
+    console.log("WebSocket Created...")
+    // Connection opened
+    socket.addEventListener('open', function (event) {
+        console.log("OPEN STARTED")
+        socket.send('Hello Server!');
+    });
+
+}
+
 
 // Most likely keep the buttons but just change the textContent of them
