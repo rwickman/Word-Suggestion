@@ -10,6 +10,7 @@ import numpy as np
 import os
 import time
 import json, re
+from random import randint
 
 # Have to pad inputs if you want to batch your input text
 # src: https://datascience.stackexchange.com/questions/26366/training-an-rnn-with-examples-of-different-lengths-in-keras
@@ -17,7 +18,7 @@ import json, re
 class Word_Suggestion:
     def __init__(self, vocab_size, max_sequence_len, word_to_id, id_to_word):
         self.vocab_size = vocab_size
-        self.max_sequence_len = max_sequence_len #i.e. num_steps
+        self.max_sequence_len = min(max_sequence_len, 30) #i.e. num_steps
         self.word_to_id = word_to_id
         self.id_to_word = id_to_word
         self.rnn_units = 1024
@@ -36,7 +37,9 @@ class Word_Suggestion:
         self.model = tf.keras.Sequential()
         self.model.add(tf.keras.layers.Embedding(self.vocab_size, self.embedding_dim, input_length=self.max_sequence_len))
         self.model.add(tf.keras.layers.LSTM(self.rnn_units,  return_sequences=True))
-        self.model.add(tf.keras.layers.Dense(self.vocab_size, activation='softmax'))
+        self.model.add(tf.keras.layers.Dense(self.vocab_size, activation='softmax') )
+        # self.model.add(tf.keras.layers.LSTM(self.rnn_units,  return_sequences=True))
+        # self.model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.vocab_size, activation='softmax')) )
         ## Configures the model for training.
         self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['categorical_accuracy'])
         #return self.model
@@ -50,47 +53,55 @@ class Word_Suggestion:
             #history = self.model.fit(X, y, epochs=num_epochs, verbose=verbose_opt, callbacks=[self.checkpoint_callback])
             pass
         else:
-            #TODO: steps_per_epoch needs to be more accurate
-            data = " ".join(data).split()
-            data = Suggest_Util.remove_escape_characters(data)
-            data = Suggest_Util.remove_whitespace(data)
-            data = Suggest_Util.remove_nonalphabet_chars(data)
-            print("data: ", len(data))
-            print(data)
             # examples_per_epoch = len(text)//seq_length
             # steps_per_epoch = examples_per_epoch//BATCH_SIZE
+            # print(data)
+
+             #self.max_sequence_len is divided by 2 because that is the approximate mean
+             ## This will allow roughly allow for the entire dataset to be trained on the model each epoch
+            steps_per_epoch = len(data.split()) // (self.batch_size * (self.max_sequence_len //2)) - (self.skip_steps - self.max_sequence_len)
+            if steps_per_epoch <= 0:
+                steps_per_epoch = len(data.split()) // (self.batch_size * self.max_sequence_len)
+                if steps_per_epoch <= 0:
+                    steps_per_epoch = 1
+            
             if has_checkpoint:
                 self.model.fit_generator(self.train_generator(data),
-                 steps_per_epoch=len(data) // (self.batch_size * self.max_sequence_len) - (self.skip_steps - self.max_sequence_len),
+                 steps_per_epoch=steps_per_epoch,
                   epochs=num_epochs, verbose=verbose_opt,
                    callbacks=[self.checkpoint_callback])
             else:
                 self.model.fit_generator(self.train_generator(data),
-                 steps_per_epoch=len(data) // (self.batch_size * self.max_sequence_len) - (self.skip_steps - self.max_sequence_len),
+                 steps_per_epoch=steps_per_epoch,
                   epochs=num_epochs, verbose=verbose_opt)
 
     def train_generator(self, data):
         """Generates training data for model
         
         # Arguments
-            data: A numpy array to be sequenced into chunks for training
+            data: A string to be sequenced into chunks for training
             max_sequence_length: A integer representing the maximum sequence length
         # Yields
             A tuple of the training pair
         """
-        data_encoded = Suggest_Util.text_to_id(" ".join(data).split(), self.word_to_id)
+        data_encoded = Suggest_Util.text_to_id(data, self.word_to_id)
         cur_index = 0
         #TODO: Train on variable number of steps
-        x = np.zeros((self.batch_size, self.max_sequence_len ))
-        y = np.zeros((self.batch_size, self.max_sequence_len, self.vocab_size))
+        # x = np.zeros((self.batch_size, self.max_sequence_len ))
+        # y = np.zeros((self.batch_size, self.max_sequence_len, self.vocab_size))
         while True:
+            batch_sequence_len = randint(1, self.max_sequence_len)
+            x = np.zeros((self.batch_size, self.max_sequence_len ))
+            y = np.zeros((self.batch_size, self.max_sequence_len, self.vocab_size))
             for i in range(self.batch_size):
-                if cur_index + self.max_sequence_len >= len(data_encoded):
+                if cur_index + batch_sequence_len >= len(data_encoded):
                     cur_index = 0
-                x[i, :] = data_encoded[cur_index: cur_index + self.max_sequence_len]
-                temp_y = data_encoded[cur_index + 1: cur_index + self.max_sequence_len + 1] 
+                x[i, :] = tf.keras.preprocessing.sequence.pad_sequences([data_encoded[cur_index: cur_index + batch_sequence_len]], maxlen=self.max_sequence_len, padding='pre')
+                temp_y = tf.keras.preprocessing.sequence.pad_sequences([data_encoded[cur_index + 1: cur_index + batch_sequence_len + 1]], maxlen=self.max_sequence_len, padding='pre')
+                # print("X: ", " ".join([self.id_to_word[str(w)] for w in data_encoded[cur_index: cur_index + self.max_sequence_len]]) )
+                # print("Y: ", " ".join([self.id_to_word[str(w)] for w in data_encoded[cur_index + 1: cur_index + self.max_sequence_len  +1]]) ) 
                 y[i, :, :] = tf.keras.utils.to_categorical(temp_y, num_classes=self.vocab_size)
-                cur_index  += self.skip_steps
+                cur_index  += randint(1, self.skip_steps * 2)
             yield x, y
 
     def predict(self, text, top_num=5):
@@ -103,20 +114,19 @@ class Word_Suggestion:
         # Returns
             A list of the top_num words
         """
-        text = Suggest_Util.remove_whitespace(text.lower())
-        text = Suggest_Util.remove_nonalphabet_chars(text)
+        text = Suggest_Util.clean_data(text)
         encoded = Suggest_Util.text_to_id(text, self.word_to_id)
         encoded_padded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=self.max_sequence_len, padding='pre')
+
         prediction = self.model.predict(encoded_padded)
-        print(prediction.shape)
         prediction = tf.squeeze(prediction, 0)
-        predict_words = np.argsort(prediction[self.max_sequence_len-1, :])[:top_num]
+        predict_words = np.argsort(prediction[self.max_sequence_len-1, :])[::-1][:top_num]
         
         return [self.id_to_word[str(word)] for word in predict_words]
 
     # generate a sequence from a language model
-    def generate_seq(self, seed_text, n_words):
-        in_text = seed_text
+    def generate_seq(self, text, n_words):
+        in_text = Suggest_Util.clean_data(text)
         # generate a fixed number of words
         for _ in range(n_words):
             # encode the text as integer
@@ -130,7 +140,7 @@ class Word_Suggestion:
             # Get the most likely word
             #predict_word = np.argmax(prediction[:, self.max_sequence_len-1, :])
             # map predicted word index to word
-            out_word = self.id_to_word[predict_word]
+            out_word = self.id_to_word[str(predict_word)]
             # append to input
             in_text += ' ' + out_word
         return in_text
@@ -151,30 +161,9 @@ class Suggest_Util:
         # Returns
             A tuple composed of word to id dictionary and id to word dictionary
         """
-        text = Suggest_Util.remove_escape_characters(text)
-        text = Suggest_Util.remove_nonalphabet_chars(text)
-        text = Suggest_Util.remove_whitespace(text)
         uniq_words = set(text.split(" "))
         word_to_id = {word:i for i, word in enumerate(uniq_words)}
-        id_to_word = {v:k for k,v in word_to_id.items()}
-        return word_to_id, id_to_word
-
-    @staticmethod
-    def data_to_id(data, old_words_to_id=None):
-        """Create a mapping between each word and a unique index
-
-        # Arguments
-            data: A numpy array to be converted to a list of integers
-
-        # Returns
-            A tuple composed of word to id dictionary and id to word dictionary
-        """
-        text = Suggest_Util.remove_escape_characters(" ".join(data))
-        text = Suggest_Util.remove_nonalphabet_chars(text)
-        text = Suggest_Util.remove_whitespace(text)
-        uniq_words = set(text.split(" "))
-        word_to_id = {word:i for i, word in enumerate(uniq_words)}
-        id_to_word = {v:k for k,v in word_to_id.items()}
+        id_to_word = {str(v):k for k,v in word_to_id.items()}
         return word_to_id, id_to_word
 
     @staticmethod
@@ -189,11 +178,8 @@ class Suggest_Util:
         # Returns
             The index of integer equivalents
         """
-        text = Suggest_Util.remove_escape_characters(text) # This may not be needed anymore
-        text = Suggest_Util.remove_nonalphabet_chars(text)
-        text = Suggest_Util.remove_whitespace(text)
         return [word_to_id_dict[word] for word in text.split(" ") if word in word_to_id_dict]
-        
+
     @staticmethod
     def remove_escape_characters(text):
         """Remove all escape characters
@@ -210,7 +196,7 @@ class Suggest_Util:
 
     @staticmethod
     def remove_whitespace(text):
-        return " ".join(text.split()[::-1])
+        return " ".join(text.split())
 
 
     @staticmethod
@@ -222,14 +208,14 @@ class Suggest_Util:
             max_lines: The max number of text lines to read from 
 
         # Returns
-            A tuple of the dialogue of type numpy array and the largest word sequence of type integer
+            A tuple of the dialogue of type string nd the largest word sequence of type integer
         """
-        dialogue = []
+        dialogue = ""
         conv = Suggest_Util.load_dict(file_name)
         largest_seq = -1
         i = 0
         for line in conv:
-            dialogue.append(line["text"])
+            dialogue += " " + line["text"]
             seq_len = len(line["text"].split(" "))
             if seq_len > largest_seq:
                 largest_seq = seq_len
@@ -237,12 +223,17 @@ class Suggest_Util:
                 i += 1
                 if i >= max_lines:
                     return dialogue, largest_seq
-        return np.array(dialogue), largest_seq
+        return dialogue, largest_seq
 
     @staticmethod
     def remove_nonalphabet_chars(text):
-        return re.sub("[^a-zA-Z\'\-$%\" ]", "", text)
+        return re.sub("[^a-zA-Z\'$% ]", "", text)
         
+    @staticmethod
+    def clean_data(data):
+        data = Suggest_Util.remove_whitespace(data.lower())
+        return Suggest_Util.remove_nonalphabet_chars(data)
+    
     @staticmethod
     def save_dict(metadata, file_name="../config/model_metadata.json"):
         with open(file_name, 'w') as f:
