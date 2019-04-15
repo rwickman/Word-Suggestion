@@ -3,7 +3,6 @@
     flex-direction: row;
     justify-content: center;
     margin-bottom: 2%;
-    /* background-color: beige; */
 }
 
 .heading{
@@ -11,14 +10,14 @@
     margin-bottom: 10%;
     font-size: 30px;
 }
-
+.suggestion {
+    margin: 1%;
+}
 .suggestion > button {
     background-color: #f1f1f1;
     width: 100px;
-    margin: 10px;
-    text-align: center;
-    padding: 10px;
-    font-size: 30px;
+    padding: 20%;
+    font-size: 120%;
 }
 
 .searchbar {

@@ -7,10 +7,9 @@ import tensorflow as tf
 tf.enable_eager_execution()
 
 import numpy as np
-import os
-import time
-import json, re
 from random import randint
+
+import os, time, json, re
 
 # Have to pad inputs if you want to batch your input text
 # src: https://datascience.stackexchange.com/questions/26366/training-an-rnn-with-examples-of-different-lengths-in-keras
@@ -90,7 +89,7 @@ class Word_Suggestion:
         # x = np.zeros((self.batch_size, self.max_sequence_len ))
         # y = np.zeros((self.batch_size, self.max_sequence_len, self.vocab_size))
         while True:
-            batch_sequence_len = randint(1, self.max_sequence_len)
+            batch_sequence_len = randint(1, self.max_sequence_len + 1)
             x = np.zeros((self.batch_size, self.max_sequence_len ))
             y = np.zeros((self.batch_size, self.max_sequence_len, self.vocab_size))
             for i in range(self.batch_size):
