@@ -1,4 +1,4 @@
-#TODO include a space as a word and allow for guessing for part of word
+#TODO allow for guessing for part of word
 #TODO Have test and validation data as well
 
 from __future__ import absolute_import, division, print_function
@@ -8,26 +8,22 @@ tf.enable_eager_execution()
 
 import numpy as np
 from random import randint
-
 import os, time, json, re
 
-# Have to pad inputs if you want to batch your input text
-# src: https://datascience.stackexchange.com/questions/26366/training-an-rnn-with-examples-of-different-lengths-in-keras
-# . Within a single batch, you must have the same number of timesteps since it must be a tensor (this is typically where you see 0-padding). But between batches there is no such restriction. During inference, you can have any length.
+
 class Word_Suggestion:
-    def __init__(self, vocab_size, max_sequence_len, word_to_id, id_to_word):
+    def __init__(self, vocab_size, max_sequence_len, word_to_id, id_to_word, checkpoint_dir='../training_checkpoints/conversation'):
         self.vocab_size = vocab_size
-        self.max_sequence_len = min(max_sequence_len, 30) #i.e. num_steps
+        self.max_sequence_len = max_sequence_len#min(max_sequence_len, 30) #i.e. num_steps
         self.word_to_id = word_to_id
         self.id_to_word = id_to_word
         self.rnn_units = 1024
         self.embedding_dim = 256 
         # Directory where the checkpoints will be saved
-        self.checkpoint_dir = '../training_checkpoints'
+        self.checkpoint_dir = checkpoint_dir
         # Name of the checkpoint files
         self.checkpoint_prefix = os.path.join(self.checkpoint_dir, "ckpt_{epoch}")
-        # <Q>SHOULD I SAVE THE WHOLE MODEL?
-        self.checkpoint_callback=tf.keras.callbacks.ModelCheckpoint( filepath=self.checkpoint_prefix, save_weights_only=True)
+        self.checkpoint_callback=tf.keras.callbacks.ModelCheckpoint( filepath=self.checkpoint_prefix, save_best_only=True, save_weights_only=True)
         self.batch_size = 10
         self.skip_steps = 5 # The number of steps to skip before next batch is taken
 
@@ -41,7 +37,6 @@ class Word_Suggestion:
         # self.model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.vocab_size, activation='softmax')) )
         ## Configures the model for training.
         self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['categorical_accuracy'])
-        #return self.model
 
     def load_and_build_latest_model(self):
         self.build_model()
@@ -49,7 +44,9 @@ class Word_Suggestion:
     
     def train(self, data, use_generator=False, num_epochs=5, has_checkpoint=False, verbose_opt=1):
         if not use_generator:
-            #history = self.model.fit(X, y, epochs=num_epochs, verbose=verbose_opt, callbacks=[self.checkpoint_callback])
+            X = data[0]
+            y = data[1]
+            history = self.model.fit(X, y, epochs=num_epochs, verbose=verbose_opt, callbacks=[self.checkpoint_callback])
             pass
         else:
             # examples_per_epoch = len(text)//seq_length
@@ -85,9 +82,6 @@ class Word_Suggestion:
         """
         data_encoded = Suggest_Util.text_to_id(data, self.word_to_id)
         cur_index = 0
-        #TODO: Train on variable number of steps
-        # x = np.zeros((self.batch_size, self.max_sequence_len ))
-        # y = np.zeros((self.batch_size, self.max_sequence_len, self.vocab_size))
         while True:
             batch_sequence_len = randint(1, self.max_sequence_len + 1)
             x = np.zeros((self.batch_size, self.max_sequence_len ))
@@ -151,7 +145,7 @@ class Suggest_Util:
     #TODO include a way to update old one
     #@return (word_to_id, id_to_word)
     @staticmethod
-    def words_to_id(text, old_words_to_id=None):
+    def words_to_id(text, is_list=False, old_words_to_id=None):
         """Create a mapping between each word and a unique index
 
         # Arguments
@@ -160,6 +154,12 @@ class Suggest_Util:
         # Returns
             A tuple composed of word to id dictionary and id to word dictionary
         """
+        
+        if is_list:
+            x = ""
+            for line in text:
+                x += line + " "
+            text = x
         uniq_words = set(text.split(" "))
         word_to_id = {word:i for i, word in enumerate(uniq_words)}
         id_to_word = {str(v):k for k,v in word_to_id.items()}
@@ -175,7 +175,7 @@ class Suggest_Util:
             word_to_id_dict: A dictionary used to get the index of each word
 
         # Returns
-            The index of integer equivalents
+            A list of the id equivalents
         """
         return [word_to_id_dict[word] for word in text.split(" ") if word in word_to_id_dict]
 
@@ -225,6 +225,44 @@ class Suggest_Util:
         return dialogue, largest_seq
 
     @staticmethod
+    def parse_movie_quotes(file_name):
+        quotes = []
+        movie_quotes = Suggest_Util.load_dict(file_name)
+        largest_seq = -1
+        i = 0
+        for line in movie_quotes:
+            quotes.append(Suggest_Util.clean_data(line["quote"]))
+            seq_len = len(line["quote"].split(" "))
+            if seq_len > largest_seq:
+                largest_seq = seq_len
+        return quotes, largest_seq
+
+    @staticmethod
+    def split_by_word_sequentially(data, word_to_id_dict, max_sequence_len):
+        """Create the training dataset by splitting all lines by word and after it (this is hard to explain)
+        EX: data = ["how are you"]
+        X = ["how", "how are"]
+        y = ["are", "you"]
+
+        # Arguments
+            data: A list of strings
+            word_to_id_dict: A dictionary used to get the index of each word 
+
+        # Returns
+            A tuple of X and y training data
+        """
+        seq = []
+        for line in data:
+            encoded_line = Suggest_Util.text_to_id(line, word_to_id_dict)
+            for i in range(1, len(encoded_line)):
+                seq.append(encoded_line[:i+1])
+        sequences = tf.keras.preprocessing.sequence.pad_sequences(seq, maxlen=max_sequence_len, padding='pre')
+        sequences = np.array(sequences)
+        X, y = sequences[:,:-1],sequences[:,-1]
+        y =  tf.keras.utils.to_categorical(y, num_classes=len(word_to_id_dict))
+        return X, y        
+            
+    @staticmethod
     def remove_nonalphabet_chars(text):
         return re.sub("[^a-zA-Z\'$% ]", "", text)
         
@@ -242,3 +280,11 @@ class Suggest_Util:
     def load_dict(file_name="../config/model_metadata.json"):
         with open(file_name, 'r') as f:
             return json.load(f)
+
+
+# quotes, lrg = Suggest_Util.parse_movie_quotes("../data/movie_quotes.json")
+# word_to_id_dict, _ = Suggest_Util.words_to_id(quotes, True)
+
+# data = Suggest_Util.split_by_word_sequentially(quotes, word_to_id_dict, lrg)
+# print(data)
+# print(len(data[0]))

@@ -17,7 +17,6 @@ function createWebsocket(text) {
     // Connection opened
     socket.addEventListener('open', function (event) {
         socket.send(text);
-       
     });
 
     socket.addEventListener('message', function (event) {
@@ -50,7 +49,6 @@ function createNewSuggestions(suggestions) {
         suggest_con.appendChild(div_el)
     }
 }
-
 
 window.onload = function () {
     // Create the empty suggestions
