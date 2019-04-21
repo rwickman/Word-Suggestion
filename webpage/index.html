@@ -4,16 +4,17 @@
     <script src="suggest.js"></script>
     <link rel="stylesheet" type="text/css" href="stylesheet.css">
 </head>
-<!-- <body onload="generateButtonEvents(); createWebsocket();">> -->
-<body">
+<body>
     <div class="heading">
         <h1>
             Word Suggestion Demo
         </h1>
     </div>
-    <h3 id="Suggested-Words-Text">Suggested Words</h3>
-    <div id="suggestions-container" class="flex-container">
-    </div>
+    <h3 class="Suggested-Words-Text">Suggested Words</h3>
+    <div id="suggestions-container" class="flex-container"></div>
+    <h3 class="Suggested-Words-Text">Suggested from RNN's found with LSH</h3>
+    <div id="lsh-suggestions-container" class="flex-container"></div>
+    
     <div class="searchbar">
             <span contenteditable="true" id="text-box"></span>
     </div>

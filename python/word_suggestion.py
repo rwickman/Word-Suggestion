@@ -310,11 +310,3 @@ class Suggest_Util:
     def load_dict(file_name="../config/model_metadata.json"):
         with open(file_name, 'r') as f:
             return json.load(f)
-
-
-# quotes, lrg = Suggest_Util.parse_movie_quotes("../data/movie_quotes.json")
-# word_to_id_dict, _ = Suggest_Util.words_to_id(quotes, True)
-
-# data = Suggest_Util.split_by_word_sequentially(quotes, word_to_id_dict, lrg)
-# print(data)
-# print(len(data[0]))

@@ -7,7 +7,7 @@
 
 .heading{
     text-align:center;
-    margin-bottom: 10%;
+    margin-bottom: 5%;
     font-size: 30px;
 }
 .suggestion {
@@ -24,7 +24,7 @@
     text-align:center;   
 }
 
-#Suggested-Words-Text {
+.Suggested-Words-Text {
     text-align: center;
     font-size: 2em;
     text-decoration: underline;

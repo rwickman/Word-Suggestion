@@ -2,7 +2,7 @@ from word_suggestion import Word_Suggestion, Suggest_Util
 from datasketch import MinHashLSHEnsemble, MinHash
 import pickle
 
-class lsh:
+class LSH:
     def __init__(self):
         
         self.movies = Suggest_Util.load_dict("../data/movie_quotes.json")
@@ -58,6 +58,10 @@ class lsh:
         Suggest_Util.save_dict(lsh_metadata, "../config/lsh_metadata.json")
 
     def query_and_predict(self, query):
+        movie_predictions = []
+        lyric_predictions = []
+        if not query or query == " ":
+            return  {"movie predictions" : movie_predictions, "lyric predictions" : lyric_predictions}
         self.query_results = {"movies" : set(), "lyrics" : set()}
         query_minhash = MinHash(num_perm=128)
         clean_query = Suggest_Util.clean_data(query)
@@ -70,6 +74,7 @@ class lsh:
             elif key in self.lsh_metdata["lyrics"]:
                 self.query_results["lyrics"].add(key)
         
+
         if len(self.query_results["movies"]) > 0:
             movie_predictions = self.word_suggest_movies.predict(query)
         if len(self.query_results["lyrics"]) > 0:
@@ -77,5 +82,5 @@ class lsh:
         
         return {"movie predictions" : movie_predictions, "lyric predictions" : lyric_predictions}
 
-lsh = lsh()
-print(lsh.query_and_predict("can still shut down a party I can hang with anybody"))
+# lsh = lsh()
+# print(lsh.query_and_predict("can still shut down a party I can hang with anybody"))

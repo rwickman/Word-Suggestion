@@ -7,7 +7,7 @@ function onClickSuggestion(e) {
     } else {
         textBox.textContent +=" " + buttonText + " "
     }
-    createWebsocket(textBox.textContent)
+    createWebsocket(JSON.stringify({"class" : e.className , "text" : textBox.textContent}))
 }
 
 function createWebsocket(text) {
@@ -16,6 +16,7 @@ function createWebsocket(text) {
     console.log("WebSocket Created...")
     // Connection opened
     socket.addEventListener('open', function (event) {
+        console.log(text)
         socket.send(text);
     });
 
@@ -26,8 +27,21 @@ function createWebsocket(text) {
 }
 
 function createNewSuggestions(suggestions) {
-    var suggestions = suggestions.filter(word => word != "" && word != " " && word != "'" )
-    console.log(suggestions)
+    console.log(typeof suggestions["lsh suggestions"])
+    var lsh_suggestions = suggestions["lsh suggestions"]
+    
+    var suggestions = suggestions["suggestions"].filter(word => word != "" && word != " " && word != "'" )
+    if (lsh_suggestions["movie predictions"]) {
+        var lsh_suggestions_movies = lsh_suggestions["movie predictions"].filter(word => word != "" && word != " " && word != "'" )
+    } else {
+        var lsh_suggestions_movies = []
+    }
+    if (lsh_suggestions["lyric predictions"]) {
+        var lsh_suggestions_lyrics = lsh_suggestions["lyric predictions"].filter(word => word != "" && word != " " && word != "'" )
+    } else {
+        var lsh_suggestions_movies = []
+    }
+    console.log(lsh_suggestions)
     
     
     var suggest_con = document.getElementById("suggestions-container")
@@ -35,11 +49,11 @@ function createNewSuggestions(suggestions) {
     while(suggest_con.firstChild) {
         suggest_con.removeChild(suggest_con.firstChild)
     }
-
-   
+    var id_num = 0
+    // Add the new suggestions
     for(var i = 0; i < suggestions.length; i++) {
         var div_el = document.createElement("div")
-        div_el.setAttribute("id", i)
+        div_el.setAttribute("id", id_num++)
         div_el.setAttribute("class", "suggestion")
         var button_el = document.createElement("button")
         button_el.setAttribute("type", "button")
@@ -48,17 +62,51 @@ function createNewSuggestions(suggestions) {
         div_el.appendChild(button_el)
         suggest_con.appendChild(div_el)
     }
+
+    var lsh_suggest_con = document.getElementById("lsh-suggestions-container")
+    // Remove all old suggestions
+    while(lsh_suggest_con.firstChild) {
+        lsh_suggest_con.removeChild(lsh_suggest_con.firstChild)
+    }
+
+    // Add the new LSH RNN suggestions
+    for(var i = 0; i < lsh_suggestions_movies.length; i++) {
+        var div_el = document.createElement("div")
+        div_el.setAttribute("id", id_num++)
+        div_el.setAttribute("class", "suggestion")
+        var button_el = document.createElement("button")
+        button_el.setAttribute("type", "button")
+        button_el.setAttribute("onclick", "onClickSuggestion(this)")
+        button_el.setAttribute("class", "movies")
+        button_el.textContent = lsh_suggestions_movies[i]
+        div_el.appendChild(button_el)
+        lsh_suggest_con.appendChild(div_el)
+    }
+
+    // Add the new LSH RNN suggestions
+    for(var i = 0; i < lsh_suggestions_lyrics.length; i++) {
+        var div_el = document.createElement("div")
+        div_el.setAttribute("id", id_num++)
+        div_el.setAttribute("class", "suggestion")
+        var button_el = document.createElement("button")
+        button_el.setAttribute("type", "button")
+        button_el.setAttribute("onclick", "onClickSuggestion(this)")
+        button_el.setAttribute("class", "lyrics")
+        button_el.textContent = lsh_suggestions_lyrics[i]
+        div_el.appendChild(button_el)
+        lsh_suggest_con.appendChild(div_el)
+    }
 }
 
 window.onload = function () {
     // Create the empty suggestions
-    createWebsocket("")
+    createWebsocket(JSON.stringify({"class" : "", "text" : ""}))
 
     // If a new word is entered instead of button pressed do this
     document.getElementById("text-box").addEventListener("keydown", function(e) {
         console.log("SPACE PRESSED")
         if (e.keyCode == 32) {
-            createWebsocket(this.textContent)
+            createWebsocket(JSON.stringify({"class" : this.className , "text" : this.textContent}))
         }
     });
 }
