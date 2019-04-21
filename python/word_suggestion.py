@@ -128,6 +128,14 @@ class Word_Suggestion:
                         y =  tf.keras.utils.to_categorical(y, num_classes=self.vocab_size)
                         yield X, y
 
+    def train_update(self, data):
+        #Consider spanwing this off in a different thread
+        self.word_to_id, self.id_to_word = Suggest_Util.words_to_id(data, True, self.word_to_id)
+        self.vocab_size = len(self.word_to_id)
+        self.load_and_build_latest_model()
+        self.train(data,"lyrics", num_epochs=2, has_checkpoint=True)
+
+
     def predict(self, text, top_num=5):
         """Predict the word that could come next in the given text
 
@@ -168,7 +176,6 @@ class Word_Suggestion:
             # append to input
             in_text += ' ' + out_word
         return in_text
-    
 
 
 
@@ -176,23 +183,35 @@ class Suggest_Util:
     #TODO include a way to update old one
     #@return (word_to_id, id_to_word)
     @staticmethod
-    def words_to_id(text, is_list=False, old_words_to_id=None):
+    def words_to_id(text, is_list=False, old_word_to_id=None):
         """Create a mapping between each word and a unique index
 
         # Arguments
-            text: A string to be converted to a list of integers
+            text: A string or list to be converted to a list of integers
+            is_list: True if text is a list
+            old_words_to_id: A dictionary of the words_to_id that need to be updated
 
         # Returns
             A tuple composed of word to id dictionary and id to word dictionary
         """
-        
         if is_list:
             x = ""
             for line in text:
                 x += line + " "
             text = x
+        
         uniq_words = set(text.split(" "))
-        word_to_id = {word:i for i, word in enumerate(uniq_words)}
+        
+        if old_word_to_id:
+            word_to_id = old_word_to_id
+            start = len(old_word_to_id)
+            for word in uniq_words:
+                if word not in word_to_id:
+                    word_to_id[word] = start
+                    start += 1
+        else:
+            word_to_id = {word:i for i, word in enumerate(uniq_words)}
+        
         id_to_word = {str(v):k for k,v in word_to_id.items()}
         return word_to_id, id_to_word
 

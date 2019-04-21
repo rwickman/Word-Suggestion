@@ -4,7 +4,6 @@ import pickle
 
 class LSH:
     def __init__(self):
-        
         self.movies = Suggest_Util.load_dict("../data/movie_quotes.json")
         self.lyrics = Suggest_Util.load_dict("../data/lyrics.json")
         
@@ -82,5 +81,23 @@ class LSH:
         
         return {"movie predictions" : movie_predictions, "lyric predictions" : lyric_predictions}
 
-# lsh = lsh()
+    def get_data(self, class_type):
+        data = []
+        if class_type == "movies":
+            for key in self.query_results["movies"]:
+                movie_quote = key.split(" quote: ")[1]
+                data.append(Suggest_Util.clean_data(movie_quote))
+        elif class_type == "lyrics":
+            for key in self.query_results["lyrics"]:
+                artist = key.split(" song: ")[0]
+                for d in self.lyrics:
+                    if d["Artist"] == artist:
+                        data.append(Suggest_Util.clean_data(d["Lyrics"]))
+                        continue
+        return data
+
+            
+# lsh = LSH()
 # print(lsh.query_and_predict("can still shut down a party I can hang with anybody"))
+# print(lsh.get_data("movies"))
+# print(lsh.get_data("lyrics"))

@@ -6,21 +6,27 @@ from lsh import LSH
 
 def main():
     async def get_response(websocket, path):
-        try:
-            response = await websocket.recv()
-            response_decoded = json.loads(response)
-            text = response_decoded["text"]
-            # print(f"< {text}")
-            print(response_decoded["class"])
-            suggestions = word_suggest.predict(text)
-            lsh_suggestions = lsh.query_and_predict(text)
-        except Exception as e:
-            print("ERROR IN ASYNC RESPONSE: ", e)
+        # try:
+        response = await websocket.recv()
+        response_decoded = json.loads(response)
+        text = response_decoded["text"]
+        print(f"< {text}")
+        response_class = response_decoded["class"]
 
+        if response_class:
+            lsh_data = lsh.get_data(response_class)
+            word_suggest.train_update(lsh_data)
+
+        suggestions = word_suggest.predict(text)
+        lsh_suggestions = lsh.query_and_predict(text)
         await websocket.send(json.dumps(
-            {"suggestions" : suggestions,
-             "lsh suggestions" : lsh_suggestions }
-             ))
+        {"suggestions" : suggestions,
+            "lsh suggestions" : lsh_suggestions }
+            ))
+        # except Exception as e:
+        #     print("ERROR IN ASYNC RESPONSE: ", e)
+
+
     
     model_metadata = Suggest_Util.load_dict()
     word_suggest = Word_Suggestion(*model_metadata.values())
