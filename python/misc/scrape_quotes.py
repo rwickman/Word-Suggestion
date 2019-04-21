@@ -25,7 +25,7 @@ for li in ol.find_all("li"):
     if quote:
         movie_quotes.append(
             {
-                "movie:" : movie,
+                "movie" : movie,
                 "quote" : quote
             }
         )

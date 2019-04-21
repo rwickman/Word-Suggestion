@@ -9,12 +9,14 @@ tf.enable_eager_execution()
 import numpy as np
 from random import randint
 import os, time, json, re
+from math import ceil
 
 
 class Word_Suggestion:
-    def __init__(self, vocab_size, max_sequence_len, word_to_id, id_to_word, checkpoint_dir='../training_checkpoints/conversation'):
+    def __init__(self, vocab_size, max_sequence_len, word_to_id, id_to_word, checkpoint_dir='../models/training_checkpoints/conversation'):
         self.vocab_size = vocab_size
-        self.max_sequence_len = max_sequence_len#min(max_sequence_len, 30) #i.e. num_steps
+        self.input_length = min(max_sequence_len, 40) #i.e. num_steps
+        self.max_sequence_length = max_sequence_len
         self.word_to_id = word_to_id
         self.id_to_word = id_to_word
         self.rnn_units = 1024
@@ -23,14 +25,14 @@ class Word_Suggestion:
         self.checkpoint_dir = checkpoint_dir
         # Name of the checkpoint files
         self.checkpoint_prefix = os.path.join(self.checkpoint_dir, "ckpt_{epoch}")
-        self.checkpoint_callback=tf.keras.callbacks.ModelCheckpoint( filepath=self.checkpoint_prefix, save_best_only=True, save_weights_only=True)
+        self.checkpoint_callback=tf.keras.callbacks.ModelCheckpoint( filepath=self.checkpoint_prefix, save_weights_only=True)
         self.batch_size = 10
         self.skip_steps = 5 # The number of steps to skip before next batch is taken
 
     # Build the model, this will need to modified
     def build_model(self):
         self.model = tf.keras.Sequential()
-        self.model.add(tf.keras.layers.Embedding(self.vocab_size, self.embedding_dim, input_length=self.max_sequence_len))
+        self.model.add(tf.keras.layers.Embedding(self.vocab_size, self.embedding_dim, input_length=self.input_length))
         self.model.add(tf.keras.layers.LSTM(self.rnn_units,  return_sequences=True))
         self.model.add(tf.keras.layers.Dense(self.vocab_size, activation='softmax') )
         # self.model.add(tf.keras.layers.LSTM(self.rnn_units,  return_sequences=True))
@@ -42,35 +44,48 @@ class Word_Suggestion:
         self.build_model()
         self.model.load_weights(tf.train.latest_checkpoint(self.checkpoint_dir))
     
-    def train(self, data, use_generator=False, num_epochs=5, has_checkpoint=False, verbose_opt=1):
-        if not use_generator:
+    def train(self, data, generator="", num_epochs=5, has_checkpoint=False, verbose_opt=1):
+        if not generator:
             X = data[0]
             y = data[1]
             history = self.model.fit(X, y, epochs=num_epochs, verbose=verbose_opt, callbacks=[self.checkpoint_callback])
-            pass
-        else:
+        elif generator == "conversation":
             # examples_per_epoch = len(text)//seq_length
             # steps_per_epoch = examples_per_epoch//BATCH_SIZE
             # print(data)
 
-             #self.max_sequence_len is divided by 2 because that is the approximate mean
+             #self.input_length is divided by 2 because that is the approximate mean
              ## This will allow roughly allow for the entire dataset to be trained on the model each epoch
-            steps_per_epoch = len(data.split()) // (self.batch_size * (self.max_sequence_len //2)) - (self.skip_steps - self.max_sequence_len)
+            steps_per_epoch = len(data.split()) // (self.batch_size * (self.input_length //2)) - (self.skip_steps - self.input_length)
             if steps_per_epoch <= 0:
-                steps_per_epoch = len(data.split()) // (self.batch_size * self.max_sequence_len)
+                steps_per_epoch = len(data.split()) // (self.batch_size * self.input_length)
                 if steps_per_epoch <= 0:
                     steps_per_epoch = 1
-            
+           
             if has_checkpoint:
                 self.model.fit_generator(self.train_generator(data),
-                 steps_per_epoch=steps_per_epoch,
-                  epochs=num_epochs, verbose=verbose_opt,
-                   callbacks=[self.checkpoint_callback])
+                steps_per_epoch=steps_per_epoch,
+                epochs=num_epochs, verbose=verbose_opt,
+                callbacks=[self.checkpoint_callback])
             else:
                 self.model.fit_generator(self.train_generator(data),
-                 steps_per_epoch=steps_per_epoch,
-                  epochs=num_epochs, verbose=verbose_opt)
+                steps_per_epoch=steps_per_epoch,
+                epochs=num_epochs, verbose=verbose_opt)
 
+        elif generator == "lyrics":
+            steps_per_epoch =  ceil( (len(data)  * self.max_sequence_length - 1 )/ self.batch_size)
+            if has_checkpoint:
+                self.model.fit_generator(self.train_generator_lyrics(data),
+                steps_per_epoch=steps_per_epoch,
+                epochs=num_epochs, verbose=verbose_opt,
+                callbacks=[self.checkpoint_callback])
+            else:
+                self.model.fit_generator(self.train_generator_lyrics(data),
+                steps_per_epoch=steps_per_epoch,
+                epochs=num_epochs, verbose=verbose_opt)
+        else:
+            raise Exception("INVALID GENERATOR")
+    
     def train_generator(self, data):
         """Generates training data for model
         
@@ -83,19 +98,35 @@ class Word_Suggestion:
         data_encoded = Suggest_Util.text_to_id(data, self.word_to_id)
         cur_index = 0
         while True:
-            batch_sequence_len = randint(1, self.max_sequence_len + 1)
-            x = np.zeros((self.batch_size, self.max_sequence_len ))
-            y = np.zeros((self.batch_size, self.max_sequence_len, self.vocab_size))
+            batch_sequence_len = randint(1, self.input_length + 1)
+            x = np.zeros((self.batch_size, self.input_length ))
+            y = np.zeros((self.batch_size, self.input_length, self.vocab_size))
             for i in range(self.batch_size):
                 if cur_index + batch_sequence_len >= len(data_encoded):
                     cur_index = 0
-                x[i, :] = tf.keras.preprocessing.sequence.pad_sequences([data_encoded[cur_index: cur_index + batch_sequence_len]], maxlen=self.max_sequence_len, padding='pre')
-                temp_y = tf.keras.preprocessing.sequence.pad_sequences([data_encoded[cur_index + 1: cur_index + batch_sequence_len + 1]], maxlen=self.max_sequence_len, padding='pre')
-                # print("X: ", " ".join([self.id_to_word[str(w)] for w in data_encoded[cur_index: cur_index + self.max_sequence_len]]) )
-                # print("Y: ", " ".join([self.id_to_word[str(w)] for w in data_encoded[cur_index + 1: cur_index + self.max_sequence_len  +1]]) ) 
+                x[i, :] = tf.keras.preprocessing.sequence.pad_sequences([data_encoded[cur_index: cur_index + batch_sequence_len]], maxlen=self.input_length, padding='pre')
+                temp_y = tf.keras.preprocessing.sequence.pad_sequences([data_encoded[cur_index + 1: cur_index + batch_sequence_len + 1]], maxlen=self.input_length, padding='pre')
+                # print("X: ", " ".join([self.id_to_word[str(w)] for w in data_encoded[cur_index: cur_index + self.input_length]]) )
+                # print("Y: ", " ".join([self.id_to_word[str(w)] for w in data_encoded[cur_index + 1: cur_index + self.input_length  +1]]) ) 
                 y[i, :, :] = tf.keras.utils.to_categorical(temp_y, num_classes=self.vocab_size)
                 cur_index  += randint(1, self.skip_steps * 2)
             yield x, y
+    
+    def train_generator_lyrics(self, data):
+        while True:
+            for line in data:
+                seq = []
+                encoded_line = Suggest_Util.text_to_id(line, self.word_to_id)
+                for i in range(1, len(encoded_line)):
+                    seq.append(encoded_line[:i+1])
+                    if (i+1) % self.batch_size == 0:
+                        #Padding will  either add 0's or remove the first few elements depending on the size
+                        sequences = tf.keras.preprocessing.sequence.pad_sequences(seq, maxlen=self.input_length + 1, padding='pre')
+                        seq = []
+                        sequences = np.array(sequences)
+                        X, y = sequences[:,:-1], sequences[:,1:]
+                        y =  tf.keras.utils.to_categorical(y, num_classes=self.vocab_size)
+                        yield X, y
 
     def predict(self, text, top_num=5):
         """Predict the word that could come next in the given text
@@ -109,11 +140,11 @@ class Word_Suggestion:
         """
         text = Suggest_Util.clean_data(text)
         encoded = Suggest_Util.text_to_id(text, self.word_to_id)
-        encoded_padded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=self.max_sequence_len, padding='pre')
+        encoded_padded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=self.input_length, padding='pre')
 
         prediction = self.model.predict(encoded_padded)
         prediction = tf.squeeze(prediction, 0)
-        predict_words = np.argsort(prediction[self.max_sequence_len-1, :])[::-1][:top_num]
+        predict_words = np.argsort(prediction[self.input_length-1, :])[::-1][:top_num]
         
         return [self.id_to_word[str(word)] for word in predict_words]
 
@@ -125,13 +156,13 @@ class Word_Suggestion:
             # encode the text as integer
             encoded = Suggest_Util.text_to_id(in_text, self.word_to_id)
             # pre-pad sequences to a fixed length
-            encoded_padded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=self.max_sequence_len, padding='pre')
+            encoded_padded = tf.keras.preprocessing.sequence.pad_sequences([encoded], maxlen=self.input_length, padding='pre')
             # predict probabilities for each word
             prediction = self.model.predict(encoded_padded)
             prediction = tf.squeeze(prediction, 0)
             predict_word = tf.multinomial(prediction, num_samples=1)[-1,0].numpy()
             # Get the most likely word
-            #predict_word = np.argmax(prediction[:, self.max_sequence_len-1, :])
+            #predict_word = np.argmax(prediction[:, self.input_length-1, :])
             # map predicted word index to word
             out_word = self.id_to_word[str(predict_word)]
             # append to input
@@ -225,14 +256,13 @@ class Suggest_Util:
         return dialogue, largest_seq
 
     @staticmethod
-    def parse_movie_quotes(file_name):
+    def parse_movie_quotes(file_name, name="quote"):
         quotes = []
         movie_quotes = Suggest_Util.load_dict(file_name)
         largest_seq = -1
-        i = 0
         for line in movie_quotes:
-            quotes.append(Suggest_Util.clean_data(line["quote"]))
-            seq_len = len(line["quote"].split(" "))
+            quotes.append(Suggest_Util.clean_data(line[name]))
+            seq_len = len(line[name].split(" "))
             if seq_len > largest_seq:
                 largest_seq = seq_len
         return quotes, largest_seq
@@ -258,7 +288,7 @@ class Suggest_Util:
                 seq.append(encoded_line[:i+1])
         sequences = tf.keras.preprocessing.sequence.pad_sequences(seq, maxlen=max_sequence_len, padding='pre')
         sequences = np.array(sequences)
-        X, y = sequences[:,:-1],sequences[:,-1]
+        X, y = sequences[:,:-1], sequences[:,1:]
         y =  tf.keras.utils.to_categorical(y, num_classes=len(word_to_id_dict))
         return X, y        
             
