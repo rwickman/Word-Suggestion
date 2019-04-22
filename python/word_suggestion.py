@@ -129,12 +129,17 @@ class Word_Suggestion:
                         yield X, y
 
     def train_update(self, data):
-        #Consider spanwing this off in a different thread
-        self.word_to_id, self.id_to_word = Suggest_Util.words_to_id(data, True, self.word_to_id)
-        self.vocab_size = len(self.word_to_id)
-        self.load_and_build_latest_model()
-        self.train(data,"lyrics", num_epochs=2, has_checkpoint=True)
-
+        try:
+            #Consider spanwing this off in a different thread
+            self.word_to_id, self.id_to_word = Suggest_Util.words_to_id(data, True, self.word_to_id)
+            self.vocab_size = 10000#len(self.word_to_id)
+            #self.load_and_build_latest_model()
+            self.train(data,"lyrics", num_epochs=1, has_checkpoint=False)    
+            model_metadata = {"vocab_size" : self.vocab_size, "max_sequence_length" : self.max_sequence_length, "word_to_id" : self.word_to_id, "id_to_word" : self.id_to_word, "checkpoint_dir" : '../models/training_checkpoints/conversation'}
+            Suggest_Util.save_dict(model_metadata)  
+            self.model.save('../models/training_checkpoints/conversation/conv_model.h5')
+        except Exception as e:
+            print("ERROR DURING train_update: ", e)
 
     def predict(self, text, top_num=5):
         """Predict the word that could come next in the given text

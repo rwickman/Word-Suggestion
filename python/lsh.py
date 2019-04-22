@@ -16,9 +16,12 @@ class LSH:
 
         self.word_suggest_movies.load_and_build_latest_model()
         self.word_suggest_lyrics.load_and_build_latest_model()
-
-        self.lsh_ensemble = pickle.load(open("../models/lshensemble.p", "rb"))
-
+        
+        try:
+            self.lsh_ensemble = pickle.load(open("../models/lshensemble.p", "rb"))
+        except:
+            self.create_lsh_ensemble()
+        
         # This will store the keys of the results with containment > 0.64: 
         self.query_results = {"movies" : set(), "lyrics" : set()}
 
@@ -47,12 +50,11 @@ class LSH:
 
         # Create an LSH Ensemble index with threshold and number of partition
         # settings.
-        lshensemble = MinHashLSHEnsemble(threshold=0.64, num_perm=128, num_part=32)
+        lshensemble = MinHashLSHEnsemble(threshold=0.60, num_perm=128, num_part=32)
 
-        # Index takes an iterable of (key,
-        #  minhash, size)
+        # Index takes an iterable of (key, minhash, size)
         lshensemble.index(minhashes)
-
+        self.lsh_ensemble = lshensemble
         pickle.dump(lshensemble, open("../models/lshensemble.p", "wb"))
         Suggest_Util.save_dict(lsh_metadata, "../config/lsh_metadata.json")
 
@@ -98,6 +100,6 @@ class LSH:
 
             
 # lsh = LSH()
-# print(lsh.query_and_predict("can still shut down a party I can hang with anybody"))
+# print(lsh.query_and_predict("horses"))
 # print(lsh.get_data("movies"))
 # print(lsh.get_data("lyrics"))

@@ -29,15 +29,16 @@ def main():
         data, max_sequence_length = Suggest_Util.parse_conversation_json("../data/conversation.json", 100)
         data = Suggest_Util.clean_data(data)
         word_to_id, id_to_word = Suggest_Util.words_to_id(data)
-        vocab_size = len(word_to_id)
+        vocab_size = 10000#len(word_to_id)
         word_suggest = Word_Suggestion(vocab_size, max_sequence_length, word_to_id, id_to_word)
         word_suggest.build_model()
     
-        word_suggest.train(data,"conversation", 45, True)
-
+        word_suggest.train(data,"conversation", 60, False)
+        
         model_metadata = {"vocab_size" : vocab_size, "max_sequence_length" : max_sequence_length, "word_to_id" : word_to_id, "id_to_word" : id_to_word, "checkpoint_dir" : '../models/training_checkpoints/conversation'}
         Suggest_Util.save_dict(model_metadata)  
-    
+        word_suggest.model.save('../models/training_checkpoints/conversation/conv_model.h5')
+
     # print(word_suggest.generate_seq("they", 20))
     # print(word_suggest.predict(""))
     # print(word_suggest.predict("they do"))
