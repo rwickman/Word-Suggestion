@@ -19,9 +19,9 @@
 }
 .suggestion > button {
     background-color: #f1f1f1;
-    width: 100px;
+    width: 80px;
     padding: 20%;
-    font-size: 120%;
+    font-size: 100%;
 }
 
 .searchbar {
@@ -43,14 +43,9 @@
     font-size:24px;
     margin: 0% 0% 0% -13%;
     position: fixed;
-
-    bottom: 15%;
+    bottom: 5%;
    }
-@media screen and (max-width:50%) {
-    #text-box {
-        margin: 0% 0% 0% -20%;
-    }
-}
+
 #text-box:focus{
      outline:0;
    }
