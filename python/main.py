@@ -13,10 +13,10 @@ def main(args):
         print(f"< {text}")
         response_class = response_decoded["class"]
 
-        if args.update and response_class:
+        if args.find_similar and args.update and response_class:
             lsh_data = lsh.get_data(response_class)
             # t = threading.Thread(target=word_suggest.train_update, args=(lsh_data, ))
-            #word_suggest.train_update(lsh_data)
+            word_suggest.train_update(lsh_data)
             # t.start()
 
         suggestions = word_suggest.predict(text)
@@ -30,13 +30,17 @@ def main(args):
         # except Exception as e:
         #     print("ERROR IN ASYNC RESPONSE: ", e)
 
-    model_metadata = Suggest_Util.load_dict()
-    word_suggest = Word_Suggestion(*model_metadata.values())
-    word_suggest.build_model()
     if args.update:
+        model_metadata = Suggest_Util.load_dict("../config/updated_model_metadata.json")
+        word_suggest = Word_Suggestion(*model_metadata.values())
+        word_suggest.build_model()
         word_suggest.model =  tf.keras.models.load_model('../models/training_checkpoints/conversation/conv_model.h5') #load_and_build_latest_model()
     else:
+        model_metadata = Suggest_Util.load_dict("../config/model_metadata.json")
+        word_suggest = Word_Suggestion(*model_metadata.values())
+        word_suggest.build_model()
         word_suggest.model =  tf.keras.models.load_model('../models/training_checkpoints/conversation_no_update/conv_model.h5')
+
     if args.find_similar:
         lsh = LSH()
     
@@ -50,7 +54,6 @@ def main(args):
     loop.run_forever()
 
 if __name__ == "__main__":
-    #Arguments: Update(True or False), --find-similar
     parser = argparse.ArgumentParser(prog="Word Suggestion Demo")
     parser.add_argument('--update', action="store_true", help="Update the users RNN")
     parser.add_argument('--find-similar', action="store_true", help="Find similar users")

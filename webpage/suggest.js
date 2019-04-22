@@ -57,7 +57,7 @@ function createNewSuggestions(suggestions_d) {
         lsh_suggest_con.removeChild(lsh_suggest_con.firstChild)
     }
     
-    if (lsh_suggestions && ( lsh_suggestions["movie predictions"].length > 0 || lsh_suggestions["lyric predictions"].length > 0 )) {
+    if (lsh_suggestions && ( (lsh_suggestions["movie predictions"] && lsh_suggestions["movie predictions"].length > 0) || (lsh_suggestions["lyric predictions"] && lsh_suggestions["lyric predictions"].length > 0) )) {
         console.log(lsh_suggestions)
         if (lsh_suggestions["movie predictions"]) 
             console.log("TRUEEE")
