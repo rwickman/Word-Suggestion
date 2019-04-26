@@ -26,7 +26,7 @@ def main(args):
         await websocket.send(json.dumps(
         {"suggestions" : suggestions,
             "lsh suggestions" : lsh_suggestions }
-            ))
+            ))  
         # except Exception as e:
         #     print("ERROR IN ASYNC RESPONSE: ", e)
 
@@ -50,6 +50,7 @@ def main(args):
 
     start_server = websockets.serve(get_response, HOST, PORT)
     loop = asyncio.get_event_loop()
+    print("READY TO SERVE PREDICTIONS. YOU MAY NOW START UP WITH WEBPAGE.")
     loop.run_until_complete(start_server)
     loop.run_forever()
 
