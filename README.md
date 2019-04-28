@@ -1,8 +1,8 @@
 ﻿# Word-Suggestion
 ## Overview
-A language model built with an RNN that will predict the next word given a sequence of words.  
+A language model that will predict the next word given a sequence of words.  
 
-There is an option to use find similar users based upon what you are currently typing. It will use LSH with containment similarity, the algorithm I came up with is described in detail below.
+There is an option to find similar users and use their language model to make predictions based upon what you are currently typing. This is done by utilizing LSH with containment similarity, the algorithm I came up with is described in detail below.
 
 This project was done for COMP 4118 Data Mining.
 
